@@ -39,7 +39,8 @@ const ChangePassword = ({ onPasswordChange, submitError, setSubmitError }) => {
           className={styles.form}
           onSubmit={(e) => {
             e.preventDefault();
-            onPasswordChange(values);
+            const { current_password, new_password } = values;
+            onPasswordChange({ current_password, new_password });
           }}
         >
           <FormTitle>Изменить пароль</FormTitle>

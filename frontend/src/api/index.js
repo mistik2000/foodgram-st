@@ -39,7 +39,14 @@ class Api {
         email,
         password,
       }),
-    }).then(this.checkResponse);
+    }).then(this.checkResponse).then(data => {
+      // Handle both token formats
+      const token = data.auth_token || data.token;
+      if (token) {
+        localStorage.setItem("token", token);
+      }
+      return data;
+    });
   }
 
   signout() {
@@ -168,6 +175,7 @@ class Api {
     cooking_time = 0,
     text = "",
     ingredients = [],
+    tags = [],
   }) {
     const token = localStorage.getItem("token");
     return fetch("/api/recipes/", {
@@ -182,6 +190,7 @@ class Api {
         cooking_time,
         text,
         ingredients,
+        tags,
       }),
     }).then(this.checkResponse);
   }
@@ -355,6 +364,13 @@ class Api {
         authorization: `Token ${token}`,
       },
     }).then(this.checkFileDownloadResponse);
+  }
+
+  getTags() {
+    return fetch('/api/tags/', {
+      method: 'GET',
+      headers: this._headers
+    }).then(this.checkResponse);
   }
 }
 

@@ -22,6 +22,7 @@ import cn from "classnames";
 const RecipeCreate = ({ onEdit }) => {
   const [recipeName, setRecipeName] = useState("");
   const history = useHistory();
+  const { value: tags, handleChange: handleTagsChange, setValue: setTags } = useTags();
   const [ingredientValue, setIngredientValue] = useState({
     name: "",
     id: null,
@@ -37,6 +38,17 @@ const RecipeCreate = ({ onEdit }) => {
   const [showIngredients, setShowIngredients] = useState(false);
   const [submitError, setSubmitError] = useState({ submitError: "" });
   const [ingredientError, setIngredientError] = useState("");
+
+  useEffect(() => {
+    // Загружаем теги при монтировании компонента
+    api.getTags()
+      .then(tags => {
+        setTags(tags.map(tag => ({ ...tag, value: false })));
+      })
+      .catch(err => {
+        console.log('Error loading tags:', err);
+      });
+  }, []);
 
   const handleAddIngredient = () => {
     if (
@@ -127,6 +139,7 @@ const RecipeCreate = ({ onEdit }) => {
                 id: item.id,
                 amount: item.amount,
               })),
+              tags: tags.filter(tag => tag.value).map(tag => tag.id),
               cooking_time: recipeTime,
               image: recipeFile,
             };
