@@ -43,6 +43,7 @@ class User(AbstractUser):
         ordering = ['id']
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+        swappable = 'AUTH_USER_MODEL'
 
     def __str__(self):
         return self.username
@@ -63,29 +64,29 @@ class Profile(models.Model):
             raise ValidationError('Изображение не предоставлено')
 
         try:
-            # Проверяем формат base64 строки
+           
             if ';base64,' not in base64_image:
                 raise ValidationError('Неверный формат base64 строки')
 
             format, imgstr = base64_image.split(';base64,')
             
-            # Проверяем поддерживаемые форматы
+           
             ext = format.split('/')[-1].lower()
             if ext not in ['jpeg', 'jpg', 'png', 'gif']:
                 raise ValidationError(f'Неподдерживаемый формат изображения: {ext}')
 
-            # Пробуем декодировать base64
+        
             try:
                 image_data = base64.b64decode(imgstr)
             except Exception as e:
                 raise ValidationError('Ошибка декодирования base64 строки')
 
-            # Удаляем старый аватар, если он существует
+            
             if self.avatar:
                 if os.path.isfile(self.avatar.path):
                     os.remove(self.avatar.path)
 
-            # Сохраняем новый аватар
+           
             filename = f"{uuid.uuid4()}.{ext}"
             data = ContentFile(image_data)
             self.avatar.save(filename, data, save=True)
