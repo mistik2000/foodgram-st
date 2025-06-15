@@ -1,7 +1,10 @@
 from django.urls import include, path
 
 urlpatterns = [
-    path('', include('users.urls', namespace='users')),
+    path('users/', include('users.urls')),
     path('recipes/', include('recipes.urls', namespace='recipes')),
-    path('auth/', include('djoser.urls.authtoken')),
+    path('auth/', include([
+        path('', include('djoser.urls')),
+        path('', include('djoser.urls.authtoken')),
+    ])),
 ]

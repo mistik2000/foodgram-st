@@ -1,148 +1,84 @@
-import base64
-from django.core.files.base import ContentFile
-from rest_framework import serializers
+from rest_framework import viewsets, filters, status
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+from django.http import HttpResponse
 
-from .models import Ingredient, Recipe, RecipeIngredient, Tag
-from django.contrib.auth import get_user_model
+from .models import Ingredient, Recipe, Favorite, ShoppingCart
+from .serializers import (
+    IngredientSerializer,
+    RecipeSerializer,
+    RecipeShortSerializer
+)
+from .filters import RecipeFilter
 
 
-
-
-from rest_framework import viewsets
-
-from .serializers import IngredientSerializer, TagSerializer, RecipeSerializer
-
-User = get_user_model()
-
-class IngredientViewSet(viewsets.ModelViewSet):
+class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
+    filter_backends = (filters.SearchFilter,)
+    search_fields = ('^name',)
 
-class TagViewSet(viewsets.ModelViewSet):
-    queryset = Tag.objects.all()
-    serializer_class = TagSerializer
 
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = RecipeFilter
 
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
 
-class Base64ImageField(serializers.ImageField):
-    def to_internal_value(self, data):
-        if isinstance(data, str) and data.startswith('data:image'):
-            format, imgstr = data.split(';base64,')
-            ext = format.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
-        return super().to_internal_value(data)
+    def perform_update(self, serializer):
+        serializer.save()
 
+    def perform_destroy(self, instance):
+        instance.delete()
 
-class UserSerializer(serializers.ModelSerializer):
-    is_subscribed = serializers.SerializerMethodField()
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    def favorite(self, request, pk=None):
+        return self._handle_custom_action(Favorite, request, pk)
 
-    class Meta:
-        model = User
-        fields = (
-            'email',
-            'id',
-            'username',
-            'first_name',
-            'last_name',
-            'is_subscribed',
-        )
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    def shopping_cart(self, request, pk=None):
+        return self._handle_custom_action(ShoppingCart, request, pk)
 
-    def get_is_subscribed(self, obj):
-        user = self.context['request'].user
-        return not user.is_anonymous and user.subscriptions.filter(author=obj).exists()
+    def _handle_custom_action(self, model, request, pk):
+        recipe = Recipe.objects.filter(pk=pk).first()
+        if not recipe:
+            return Response({'detail': 'Рецепт не найден'}, status=status.HTTP_404_NOT_FOUND)
 
+        if request.method == 'POST':
+            obj, created = model.objects.get_or_create(user=request.user, recipe=recipe)
+            if not created:
+                return Response({'detail': 'Рецепт уже добавлен'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = RecipeShortSerializer(recipe, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-class TagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Tag
-        fields = ('id', 'name', 'color', 'slug')
+        deleted, _ = model.objects.filter(user=request.user, recipe=recipe).delete()
+        if deleted:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'detail': 'Рецепт не найден в списке'}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def download_shopping_cart(self, request):
+        ingredients = {}
+        recipes = Recipe.objects.filter(in_shopping_cart__user=request.user)
+        for recipe in recipes:
+            for ri in recipe.recipe_ingredients.all():
+                name = ri.ingredient.name
+                unit = ri.ingredient.measurement_unit
+                amount = ri.amount
+                if name not in ingredients:
+                    ingredients[name] = {'amount': amount, 'unit': unit}
+                else:
+                    ingredients[name]['amount'] += amount
 
-class IngredientSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Ingredient
-        fields = ('id', 'name', 'measurement_unit')
-
-
-class RecipeIngredientSerializer(serializers.ModelSerializer):
-    id = serializers.ReadOnlyField(source='ingredient.id')
-    name = serializers.ReadOnlyField(source='ingredient.name')
-    measurement_unit = serializers.ReadOnlyField(source='ingredient.measurement_unit')
-
-    class Meta:
-        model = RecipeIngredient
-        fields = ('id', 'name', 'measurement_unit', 'amount')
-
-
-class RecipeSerializer(serializers.ModelSerializer):
-    tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True)
-    author = UserSerializer(read_only=True)
-    ingredients = RecipeIngredientSerializer(many=True, read_only=True, source='recipe_ingredients')
-    is_favorited = serializers.SerializerMethodField()
-    is_in_shopping_cart = serializers.SerializerMethodField()
-    image = Base64ImageField()
-
-    class Meta:
-        model = Recipe
-        fields = (
-            'id',
-            'tags',
-            'author',
-            'ingredients',
-            'is_favorited',
-            'is_in_shopping_cart',
-            'name',
-            'image',
-            'text',
-            'cooking_time',
-        )
-
-    def get_is_favorited(self, obj):
-        user = self.context['request'].user
-        return not user.is_anonymous and obj.favorited_by.filter(user=user).exists()
-
-    def get_is_in_shopping_cart(self, obj):
-        user = self.context['request'].user
-        return not user.is_anonymous and obj.in_shopping_cart.filter(user=user).exists()
-
-    def _set_ingredients(self, recipe, ingredients_data):
-        # Используем bulk_create, чтобы избежать множественных запросов
-        ingredients = []
-        for ingredient_data in ingredients_data:
-            ingredients.append(
-                RecipeIngredient(
-                    recipe=recipe,
-                    ingredient_id=ingredient_data['id'],
-                    amount=ingredient_data['amount']
-                )
-            )
-        RecipeIngredient.objects.bulk_create(ingredients)
-
-    def create(self, validated_data):
-        tags = validated_data.pop('tags', [])
-        ingredients_data = self.initial_data.get('ingredients', [])
-
-        recipe = Recipe.objects.create(**validated_data)
-        recipe.tags.set(tags)  # set() принимает список, лучше использовать именно его
-
-        self._set_ingredients(recipe, ingredients_data)
-        return recipe
-
-    def update(self, instance, validated_data):
-        tags = validated_data.pop('tags', [])
-        ingredients_data = self.initial_data.get('ingredients', [])
-
-        instance.tags.set(tags)
-        RecipeIngredient.objects.filter(recipe=instance).delete()
-        self._set_ingredients(instance, ingredients_data)
-
-        return super().update(instance, validated_data)
-
-
-class RecipeShortSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Recipe
-        fields = ('id', 'name', 'image', 'cooking_time')
+        lines = [
+            f"{name} — {data['amount']} {data['unit']}" for name, data in ingredients.items()
+        ]
+        content = '\n'.join(lines)
+        response = HttpResponse(content, content_type='text/plain')
+        response['Content-Disposition'] = 'attachment; filename="shopping_cart.txt"'
+        return response
