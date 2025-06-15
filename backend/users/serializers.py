@@ -76,10 +76,20 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 
 class PasswordChangeSerializer(serializers.Serializer):
-    new_password = serializers.CharField(write_only=True, min_length=8)
+    """Сериализатор для смены пароля."""
+    new_password = serializers.CharField(required=True)
+    current_password = serializers.CharField(required=True)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Старый пароль неверен.')
+        return value
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
+    """Сериализатор для модели подписок."""
+
     class Meta:
         model = Subscription
         fields = ('user', 'author', 'created')

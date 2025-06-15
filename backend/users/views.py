@@ -17,6 +17,20 @@ from .models import User, Subscription
 from  api.pagination import CustomPagination
 
 
+class SubscriptionViewSet(viewsets.ModelViewSet):
+    """
+    Вьюсет для подписок.
+    """
+    serializer_class = SubscriptionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Subscription.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """
     Вьюсет для пользователей.
@@ -48,9 +62,32 @@ class UserViewSet(viewsets.ModelViewSet):
         # Возвращаем ожидаемую структуру (без лишних полей)
         return Response(serializer.to_representation(user), status=status.HTTP_201_CREATED)
 
+    @action(
+        detail=False,
+        methods=['get', 'put', 'delete'],
+        permission_classes=[IsAuthenticated]
+    )
+    def avatar(self, request):
+        """Работа с аватаром пользователя."""
+        user = request.user
+        if request.method == 'GET':
+            serializer = AvatarSerializer(user)
+            return Response(serializer.data)
+
+        if request.method == 'PUT':
+            serializer = AvatarSerializer(user, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+
+        if request.method == 'DELETE':
+            user.avatar.delete(save=True)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
-        serializer = self.get_serializer(request.user)
+        user = get_object_or_404(User, pk=request.user.id)
+        serializer = self.get_serializer(user)
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
@@ -119,6 +156,5 @@ class UserAvatarView(generics.UpdateAPIView):
 
     def delete(self, request, *args, **kwargs):
         user = self.get_object()
-        if user.avatar:
-            user.avatar.delete(save=True)
+        user.avatar.delete(save=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
