@@ -1,13 +1,13 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, status, generics, views
+
+from rest_framework import viewsets, status, views
 from rest_framework.decorators import action
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from api.pagination import CustomPagination
+
 from .models import User, Subscription
 from .serializers import (
     CustomUserCreateSerializer,
@@ -15,15 +15,11 @@ from .serializers import (
     SubscriptionListSerializer,
     PasswordChangeSerializer,
     AvatarSerializer,
+    SubscriptionSerializer,  
 )
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    """
-    Вьюсет для пользователей.
-    Создание и получение списка доступны всем.
-    Остальные действия — только аутентифицированным.
-    """
 
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
@@ -48,22 +44,17 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        # Возвращаем ожидаемую структуру (без лишних полей)
         return Response(serializer.to_representation(user), status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['get'],
-            permission_classes=(IsAuthenticated,))
+    @action(detail=False, methods=['get'], permission_classes=(IsAuthenticated,))
     def subscriptions(self, request):
         user = request.user
         authors = User.objects.filter(subscribers__user=user)
         page = self.paginate_queryset(authors)
-        serializer = self.get_serializer(
-            page, many=True, context={'request': request}
-        )
+        serializer = self.get_serializer(page, many=True, context={'request': request})
         return self.get_paginated_response(serializer.data)
 
-    @action(detail=True, methods=['post', 'delete'],
-            permission_classes=(IsAuthenticated,))
+    @action(detail=True, methods=['post', 'delete'], permission_classes=(IsAuthenticated,))
     def subscribe(self, request, pk=None):
         author = get_object_or_404(User, id=pk)
 
@@ -71,72 +62,55 @@ class UserViewSet(viewsets.ModelViewSet):
             if author == request.user:
                 return Response(
                     {'errors': 'Нельзя подписаться на самого себя.'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            if Subscription.objects.filter(user=request.user,
-                                           author=author).exists():
+            if Subscription.objects.filter(user=request.user, author=author).exists():
                 return Response(
                     {'errors': 'Вы уже подписаны на этого пользователя.'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            subscription = Subscription.objects.create(
-                user=request.user, author=author
+            data = {'user': request.user.id, 'author': author.id}
+            serializer = SubscriptionSerializer(data=data, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            subscription = serializer.save()
+            response_serializer = SubscriptionListSerializer(author, context={'request': request})
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+        deleted_count, _ = Subscription.objects.filter(user=request.user, author=author).delete()
+        if deleted_count == 0:
+            return Response(
+                {'errors': 'Вы не были подписаны на этого пользователя.'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            serializer = SubscriptionListSerializer(
-                subscription.author, context={'request': request}
-            )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-        subscription = Subscription.objects.filter(user=request.user,
-                                                   author=author)
-        if subscription.exists():
-            subscription.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        return Response(
-            {'errors': 'Вы не были подписаны на этого пользователя.'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    @action(detail=False, methods=['get'],
-            permission_classes=(IsAuthenticated,))
+    @action(detail=False, methods=['get'], permission_classes=(IsAuthenticated,))
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['patch'],
-            permission_classes=(IsAuthenticated,), name='me_patch')
+    @action(detail=False, methods=['patch'], permission_classes=(IsAuthenticated,), name='me_patch')
     def me_patch(self, request):
-        serializer = self.get_serializer(
-            request.user, data=request.data, partial=True
-        )
+        serializer = self.get_serializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
-    @action(detail=False, methods=['post'],
-            permission_classes=(IsAuthenticated,))
+    @action(detail=False, methods=['post'], permission_classes=(IsAuthenticated,))
     def set_password(self, request):
-        serializer = PasswordChangeSerializer(
-            data=request.data, context={'request': request}
-        )
+        serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UserAvatarView(views.APIView):
-    """
-    Обновление/удаление аватара пользователя.
-    """
     permission_classes = [IsAuthenticated]
     parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def put(self, request, *args, **kwargs):
-        serializer = AvatarSerializer(
-            request.user, data=request.data
-        )
+        serializer = AvatarSerializer(request.user, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)

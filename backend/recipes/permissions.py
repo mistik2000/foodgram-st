@@ -9,10 +9,6 @@ class IsAuthorOrReadOnly(BasePermission):
         )
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
-    """
-    Object-level permission to only allow owners of an object to edit it.
-    Assumes the model instance has an `author` attribute.
-    """
 
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:

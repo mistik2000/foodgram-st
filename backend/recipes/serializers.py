@@ -4,6 +4,7 @@ from .models import Ingredient, Recipe, RecipeIngredient, Favorite, ShoppingCart
 from django.contrib.auth import get_user_model
 from users.serializers import UserSerializer, Base64ImageField
 
+
 User = get_user_model()
 
 
@@ -59,12 +60,7 @@ class RecipeReadSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         return (user.is_authenticated
                 and ShoppingCart.objects.filter(user=user, recipe=obj).exists())
-
-
-from rest_framework import serializers
-from django.db import transaction
-from .models import RecipeIngredient
-from users.serializers import Base64ImageField
+        
 
 class RecipeWriteSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientWriteSerializer(many=True)
@@ -126,3 +122,11 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             instance,
             context={'request': self.context.get('request')}
         ).data
+        
+
+class ShortRecipeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Recipe
+        fields = ('id', 'name', 'image', 'cooking_time')
+        read_only_fields = fields
