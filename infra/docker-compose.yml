@@ -2,38 +2,26 @@ version: '3.3'
 services:
 
   frontend:
-    container_name: foodgram-front
+    container_name: foodgram-frontend
     build: ../frontend
     volumes:
       - ../frontend/:/app/result_build/
-  nginx:
-    container_name: foodgram-proxy
-    image: nginx:1.25.4-alpine
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
-      - ../frontend/build:/usr/share/nginx/html/
-      - ../docs/:/usr/share/nginx/html/api/docs/
-      - media_volume:/app/media/
-      - static_volume:/app/static/
+
   backend:
-    container_name: foodgram-back
+    container_name: foodgram-backend
     build:
       context: ../backend
-
-    command: sh -c "sleep 5 && python manage.py migrate && gunicorn foodgram.wsgi:application --bind 0.0.0.0:8000"
     volumes:
       - ../backend/:/app/
-      - ../data:/app/data
-      - media_volume:/app/media/
-      - static_volume:/app/static/
+      - ../data:/app/data/
+      - media_value:/app/media/
     ports:
       - "8000:8000"
     depends_on:
       - db
     env_file:
       - ../backend/.env
+
   db:
     container_name: foodgram-db
     image: postgres:14.0-alpine  
@@ -42,7 +30,19 @@ services:
     env_file:
       - ../backend/.env
 
+  nginx:
+    container_name: foodgram-nginx
+    image: nginx:1.25.4-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ../frontend/build:/usr/share/nginx/html/
+      - ../docs/:/usr/share/nginx/html/api/docs/
+      - media_value:/var/html/media/
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
-  media_volume:
-  static_volume:
+  media_value: 

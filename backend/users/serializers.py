@@ -1,139 +1,111 @@
-from django.contrib.auth import get_user_model, authenticate
-from django.core.validators import RegexValidator
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
+import base64
+import six
+import uuid
+from django.core.files.base import ContentFile
+
+from recipes.utils import ShortRecipeSerializer
 from .models import Subscription
 
 User = get_user_model()
 
 
+class Base64ImageField(serializers.ImageField):
+    def to_internal_value(self, data):
+        if isinstance(data, six.string_types):
+            if 'data:' in data and ';base64,' in data:
+                header, data = data.split(';base64,')
+
+            try:
+                decoded_file = base64.b64decode(data)
+            except TypeError:
+                self.fail('invalid_image')
+
+            file_name = str(uuid.uuid4())[:12]
+            file_extension = self.get_file_extension(file_name, decoded_file)
+            complete_file_name = "%s.%s" % (file_name, file_extension, )
+            data = ContentFile(decoded_file, name=complete_file_name)
+
+        return super(Base64ImageField, self).to_internal_value(data)
+
+    def get_file_extension(self, file_name, decoded_file):
+        import imghdr
+
+        extension = imghdr.what(file_name, decoded_file)
+        extension = "jpg" if extension == "jpeg" else extension
+
+        return extension
+
+
+class CustomUserCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            'email', 'id', 'username', 'first_name', 'last_name', 'password'
+        )
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create_user(**validated_data)
+        return user
+
+
 class UserSerializer(serializers.ModelSerializer):
     is_subscribed = serializers.SerializerMethodField()
-    avatar = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = User
         fields = (
-            'id',
-            'username',
-            'first_name',
-            'last_name',
-            'email',
-            'is_subscribed',
-            'avatar',
+            'email', 'id', 'username', 'first_name', 'last_name',
+            'is_subscribed', 'avatar'
         )
 
     def get_is_subscribed(self, obj):
-        request = self.context.get('request')
-        if not request or request.user.is_anonymous:
-            return False
-        return Subscription.objects.filter(user=request.user, author=obj).exists()
+        user = self.context['request'].user
+        return (user.is_authenticated
+                and Subscription.objects.filter(user=user, author=obj).exists())
 
 
-class UserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
+class AvatarSerializer(serializers.ModelSerializer):
+    avatar = Base64ImageField(required=True)
 
     class Meta:
         model = User
-        fields = (
-            'email',
-            'username',
-            'first_name',
-            'last_name',
-            'password',
-        )
-        extra_kwargs = {
-            'email': {'validators': [UniqueValidator(queryset=User.objects.all())]},
-            'username': {
-                'validators': [
-                    UniqueValidator(queryset=User.objects.all()),
-                    RegexValidator(
-                        regex=r'^[\w.@+-]+$',
-                        message='Имя пользователя может содержать только буквы, цифры и символы @/./+/-/_',
-                    ),
-                ],
-                'max_length': 150,
-            },
-            'first_name': {'required': True, 'max_length': 150},
-            'last_name': {'required': True, 'max_length': 150},
-        }
+        fields = ('avatar',)
 
-    def create(self, validated_data):
-        password = validated_data.pop('password')
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
-        return user
 
-    def to_representation(self, instance):
-        return {
-            'id': instance.id,
-            'email': instance.email,
-            'username': instance.username,
-            'first_name': instance.first_name,
-            'last_name': instance.last_name,
-        }
+class SubscriptionListSerializer(UserSerializer):
+    recipes = serializers.SerializerMethodField()
+    recipes_count = serializers.ReadOnlyField(source='recipes.count')
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ('recipes', 'recipes_count')
+        read_only_fields = ('email', 'username', 'first_name', 'last_name')
+
+    def get_recipes(self, obj):
+        request = self.context.get('request')
+        recipes_limit = request.query_params.get('recipes_limit')
+        recipes = obj.recipes.all()
+        if recipes_limit:
+            try:
+                recipes = recipes[:int(recipes_limit)]
+            except (TypeError, ValueError):
+                pass
+        return ShortRecipeSerializer(recipes, many=True).data
 
 
 class PasswordChangeSerializer(serializers.Serializer):
-    """Сериализатор для смены пароля."""
     new_password = serializers.CharField(required=True)
     current_password = serializers.CharField(required=True)
 
     def validate_current_password(self, value):
-        user = self.context['request'].user
+        user = self.context.get('request').user
         if not user.check_password(value):
-            raise serializers.ValidationError('Старый пароль неверен.')
+            raise serializers.ValidationError('Неверный текущий пароль.')
         return value
 
-
-class SubscriptionSerializer(serializers.ModelSerializer):
-    """Сериализатор для модели подписок."""
-
-    class Meta:
-        model = Subscription
-        fields = ('user', 'author', 'created')
-        read_only_fields = ('created', 'user')
-
-    def validate(self, data):
-        user = self.context['request'].user
-        author = data.get('author')
-        if user == author:
-            raise serializers.ValidationError('Нельзя подписаться на самого себя.')
-        if Subscription.objects.filter(user=user, author=author).exists():
-            raise serializers.ValidationError('Вы уже подписаны на этого автора.')
-        return data
-
-    def create(self, validated_data):
-        user = self.context['request'].user
-        author = validated_data['author']
-        return Subscription.objects.create(user=user, author=author)
-
-
-class AvatarSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['avatar']
-
-
-class UserProfileSerializer(serializers.ModelSerializer):
-    is_subscribed = serializers.SerializerMethodField()
-    avatar = serializers.ImageField()
-
-    class Meta:
-        model = User
-        fields = (
-            'id',
-            'username',
-            'first_name',
-            'last_name',
-            'email',
-            'is_subscribed',
-            'avatar',
-        )
-
-    def get_is_subscribed(self, obj):
-        request = self.context.get('request')
-        if not request or request.user.is_anonymous:
-            return False
-        return Subscription.objects.filter(user=request.user, author=obj).exists()
+    def save(self, **kwargs):
+        user = self.context.get('request').user
+        user.set_password(self.validated_data['new_password'])
+        user.save()

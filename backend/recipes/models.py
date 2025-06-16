@@ -23,23 +23,8 @@ class Ingredient(models.Model):
         return self.name
 
 
-class Tag(models.Model):
-    name = models.CharField(
-        max_length=100,
-        unique=True,
-        verbose_name='Название тега'
-    )
-
-    class Meta:
-        verbose_name = 'Тег'
-        verbose_name_plural = 'Теги'
-
-    def __str__(self):
-        return self.name
-
-
 class Recipe(models.Model):
-    title = models.CharField(
+    name = models.CharField(
         max_length=255,
         verbose_name='Название рецепта'
     )
@@ -49,16 +34,20 @@ class Recipe(models.Model):
         related_name='recipes',
         verbose_name='Автор рецепта'
     )
-    tags = models.ManyToManyField(
-        Tag,
-        related_name='recipes',
-        verbose_name='Теги'
-    )
     ingredients = models.ManyToManyField(
         Ingredient,
         through='RecipeIngredient',
         related_name='recipes',
         verbose_name='Ингредиенты'
+    )
+    image = models.ImageField(
+        upload_to='recipes/images/',
+        verbose_name='Изображение'
+    )
+    text = models.TextField(verbose_name='Описание')
+    cooking_time = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name='Время приготовления (в минутах)'
     )
 
     class Meta:
@@ -66,7 +55,7 @@ class Recipe(models.Model):
         verbose_name_plural = 'Рецепты'
 
     def __str__(self):
-        return self.title
+        return self.name
 
 
 class RecipeIngredient(models.Model):
@@ -93,7 +82,7 @@ class RecipeIngredient(models.Model):
         verbose_name_plural = 'Ингредиенты рецепта'
 
     def __str__(self):
-        return f'{self.ingredient.name} в {self.recipe.title} — {self.amount}'
+        return f'{self.ingredient.name} в {self.recipe.name} — {self.amount}'
     
 
 
