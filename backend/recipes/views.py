@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from .filters import IngredientSearchFilter, RecipeFilter
 from .models import Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart
 from .permissions import IsOwnerOrReadOnly
-from .serializers import IngredientSerializer, RecipeReadSerializer, RecipeWriteSerializer, ShortRecipeSerializer
+from .serializers import IngredientSerializer, RecipeReadSerializer, RecipeWriteSerializer, ShortRecipeSerializer, FavoriteCartSerializer
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
@@ -39,24 +39,31 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def _manage_relation(self, model, request, pk):
         recipe = get_object_or_404(Recipe, pk=pk)
-        relation_exists = model.objects.filter(user=request.user, recipe=recipe).exists()
+        user = request.user
+        relation = model.objects.filter(user=user, recipe=recipe)
 
         if request.method == 'POST':
-            if relation_exists:
+            if relation.exists():
                 return Response(
-                    {'errors': f'Рецепт уже в {model._meta.model_name}.'},
+                    {'errors': f'Рецепт уже в {model._meta.verbose_name}.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            model.objects.create(user=request.user, recipe=recipe)
-            serializer = self.get_serializer(recipe)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            serializer = FavoriteCartSerializer(
+                data={'recipe': recipe.id},
+                context={'request': request},
+                model_class=model
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            short_serializer = self.get_serializer(recipe)
+            return Response(short_serializer.data, status=status.HTTP_201_CREATED)
 
-        if not relation_exists:
+        deleted_count, _ = relation.delete()
+        if deleted_count == 0:
             return Response(
-                {'errors': f'Рецепта нет в {model._meta.model_name}.'},
+                {'errors': f'Рецепта нет в {model._meta.verbose_name}.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        model.objects.filter(user=request.user, recipe=recipe).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['get'])

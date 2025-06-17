@@ -35,10 +35,10 @@ class UserAdmin(BaseUserAdmin):
     def avatar_tag(self, obj):
         if obj.avatar:
             return format_html(
-                '<img src="{}" style="width:30px; height:30px; border-radius:50%;" />',
+                "<img src='{}' style='width:30px; height:30px; border-radius:50%;' />",
                 obj.avatar.url
             )
-        return "-"
+        return '-'
 
     avatar_tag.short_description = 'Аватар'
 

@@ -2,7 +2,8 @@ from django.db import transaction
 from rest_framework import serializers
 from .models import Ingredient, Recipe, RecipeIngredient, Favorite, ShoppingCart
 from django.contrib.auth import get_user_model
-from users.serializers import UserSerializer, Base64ImageField
+from users.serializers import UserSerializer
+from api.fields import Base64ImageField
 
 
 User = get_user_model()
@@ -130,3 +131,27 @@ class ShortRecipeSerializer(serializers.ModelSerializer):
         model = Recipe
         fields = ('id', 'name', 'image', 'cooking_time')
         read_only_fields = fields
+
+
+class FavoriteCartSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = None  # Будет устанавливаться динамически
+        fields = ('recipe',)
+
+    def __init__(self, *args, **kwargs):
+        # Устанавливаем модель в зависимости от контекста
+        model_class = kwargs.pop('model_class', None)
+        if model_class:
+            self.Meta.model = model_class
+        super().__init__(*args, **kwargs)
+
+    def validate_recipe(self, value):
+        user = self.context['request'].user
+        model = self.Meta.model
+        if model.objects.filter(user=user, recipe=value).exists():
+            raise serializers.ValidationError('Рецепт уже добавлен.')
+        return value
+
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return self.Meta.model.objects.create(**validated_data)

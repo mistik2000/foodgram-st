@@ -1,40 +1,11 @@
-import base64
-import uuid
-import imghdr
-
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
-
 from rest_framework import serializers
-import six
 
-from .models import Subscription 
+from api.fields import Base64ImageField
+from .models import Subscription
 
 
 User = get_user_model()
-
-
-class Base64ImageField(serializers.ImageField):
-    def to_internal_value(self, data):
-        if isinstance(data, six.string_types):
-            if 'data:' in data and ';base64,' in data:
-                _, data = data.split(';base64,')
-
-            try:
-                decoded_file = base64.b64decode(data)
-            except TypeError:
-                self.fail('invalid_image')
-
-            file_name = str(uuid.uuid4())[:12]
-            file_extension = self.get_file_extension(file_name, decoded_file)
-            complete_file_name = f'{file_name}.{file_extension}'
-            data = ContentFile(decoded_file, name=complete_file_name)
-
-        return super().to_internal_value(data)
-
-    def get_file_extension(self, file_name, decoded_file):
-        extension = imghdr.what(file_name, decoded_file)
-        return 'jpg' if extension == 'jpeg' else extension
 
 
 class CustomUserCreateSerializer(serializers.ModelSerializer):
@@ -115,6 +86,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         fields = ('user', 'author')
 
     def validate(self, data):
-        if data['user'] == data['author']:
-            raise serializers.ValidationError("Нельзя подписаться на самого себя.")
+        user = data['user']
+        author = data['author']
+        if user == author:
+            raise serializers.ValidationError('Нельзя подписаться на самого себя.')
+        if Subscription.objects.filter(user=user, author=author).exists():
+            raise serializers.ValidationError('Вы уже подписаны на этого пользователя.')
         return data

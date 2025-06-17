@@ -15,11 +15,11 @@ def custom_exception_handler(exc, context):
             for field, error_list in response.data.items():
                 if isinstance(error_list, list):
                     for error in error_list:
-                        errors.append(f"{field}: {error}")
+                        errors.append(f'{field}: {error}')
                 else:
-                    errors.append(f"{field}: {error_list}")
-            response.data = {"errors": errors}
+                    errors.append(f'{field}: {error_list}')
+            response.data = {'errors': errors}
         elif isinstance(response.data, list):
-            response.data = {"errors": response.data}
+            response.data = {'errors': response.data}
 
     return response 

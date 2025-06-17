@@ -59,21 +59,10 @@ class UserViewSet(viewsets.ModelViewSet):
         author = get_object_or_404(User, id=pk)
 
         if request.method == 'POST':
-            if author == request.user:
-                return Response(
-                    {'errors': 'Нельзя подписаться на самого себя.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if Subscription.objects.filter(user=request.user, author=author).exists():
-                return Response(
-                    {'errors': 'Вы уже подписаны на этого пользователя.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
             data = {'user': request.user.id, 'author': author.id}
             serializer = SubscriptionSerializer(data=data, context={'request': request})
             serializer.is_valid(raise_exception=True)
-            subscription = serializer.save()
+            serializer.save()
             response_serializer = SubscriptionListSerializer(author, context={'request': request})
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
