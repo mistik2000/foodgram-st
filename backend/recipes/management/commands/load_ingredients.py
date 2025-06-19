@@ -17,6 +17,8 @@ class Command(BaseCommand):
             for item in data:
                 Ingredient.objects.get_or_create(
                     name=item['name'],
-                    measurement_unit=item['measurement_unit']
+                    measurement_unit=item['measurement_unit'],
                 )
-        self.stdout.write(self.style.SUCCESS('Successfully loaded ingredients'))
+        self.stdout.write(
+            self.style.SUCCESS('Successfully loaded ingredients')
+        )

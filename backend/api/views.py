@@ -63,10 +63,12 @@ class UserViewSet(viewsets.ModelViewSet):
         user = serializer.save()
         return Response(
             serializer.to_representation(user),
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_201_CREATED,
         )
 
-    @action(detail=False, methods=['get'], permission_classes=(IsAuthenticated,))
+    @action(
+        detail=False, methods=['get'], permission_classes=(IsAuthenticated,)
+    )
     def subscriptions(self, request):
         user = request.user
         authors = User.objects.filter(subscribers__user=user)
@@ -76,7 +78,11 @@ class UserViewSet(viewsets.ModelViewSet):
         )
         return self.get_paginated_response(serializer.data)
 
-    @action(detail=True, methods=['post', 'delete'], permission_classes=(IsAuthenticated,))
+    @action(
+        detail=True,
+        methods=['post', 'delete'],
+        permission_classes=(IsAuthenticated,),
+    )
     def subscribe(self, request, pk=None):
         author = get_object_or_404(User, id=pk)
 
@@ -84,7 +90,7 @@ class UserViewSet(viewsets.ModelViewSet):
             data = {'user': request.user.id, 'author': author.id}
             serializer = SubscriptionSerializer(
                 data=data,
-                context={'request': request}
+                context={'request': request},
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -93,7 +99,7 @@ class UserViewSet(viewsets.ModelViewSet):
             )
             return Response(
                 response_serializer.data,
-                status=status.HTTP_201_CREATED
+                status=status.HTTP_201_CREATED,
             )
 
         deleted_count, _ = Subscription.objects.filter(
@@ -106,12 +112,19 @@ class UserViewSet(viewsets.ModelViewSet):
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=False, methods=['get'], permission_classes=(IsAuthenticated,))
+    @action(
+        detail=False, methods=['get'], permission_classes=(IsAuthenticated,)
+    )
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['patch'], permission_classes=(IsAuthenticated,), name='me_patch')
+    @action(
+        detail=False,
+        methods=['patch'],
+        permission_classes=(IsAuthenticated,),
+        name='me_patch',
+    )
     def me_patch(self, request):
         serializer = self.get_serializer(
             request.user, data=request.data, partial=True
@@ -120,7 +133,9 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer.save()
         return Response(serializer.data)
 
-    @action(detail=False, methods=['post'], permission_classes=(IsAuthenticated,))
+    @action(
+        detail=False, methods=['post'], permission_classes=(IsAuthenticated,)
+    )
     def set_password(self, request):
         serializer = PasswordChangeSerializer(
             data=request.data, context={'request': request}
@@ -178,12 +193,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
             if relation.exists():
                 return Response(
                     {'errors': f'Рецепт уже в {model._meta.verbose_name}.'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
             serializer = FavoriteCartSerializer(
                 data={'recipe': recipe.id},
                 context={'request': request},
-                model_class=model
+                model_class=model,
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -194,7 +209,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if deleted_count == 0:
             return Response(
                 {'errors': f'Рецепта нет в {model._meta.verbose_name}.'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -202,11 +217,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_link(self, request, pk=None):
         return Response({'short-link': request.build_absolute_uri()})
 
-    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    @action(
+        detail=True,
+        methods=['post', 'delete'],
+        permission_classes=[IsAuthenticated],
+    )
     def favorite(self, request, pk=None):
         return self._manage_relation(Favorite, request, pk)
 
-    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    @action(
+        detail=True,
+        methods=['post', 'delete'],
+        permission_classes=[IsAuthenticated],
+    )
     def shopping_cart(self, request, pk=None):
         return self._manage_relation(ShoppingCart, request, pk)
 
@@ -215,7 +238,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             recipe__in_shopping_cart__user=user
         ).values(
             'ingredient__name',
-            'ingredient__measurement_unit'
+            'ingredient__measurement_unit',
         ).annotate(
             total_amount=Sum('amount')
         ).order_by('ingredient__name')
@@ -229,13 +252,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
         return shopping_list
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    @action(
+        detail=False,
+        methods=['get'],
+        permission_classes=[IsAuthenticated],
+    )
     def download_shopping_cart(self, request):
         shopping_list = self._generate_shopping_list_text(request.user)
 
         response = HttpResponse(
             shopping_list,
-            content_type='text/plain; charset=utf-8'
+            content_type='text/plain; charset=utf-8',
         )
-        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
+        response['Content-Disposition'] = (
+            'attachment; filename="shopping_list.txt"'
+        )
         return response

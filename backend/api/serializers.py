@@ -22,7 +22,7 @@ class CustomUserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'email', 'id', 'username', 'first_name', 'last_name', 'password'
+            'email', 'id', 'username', 'first_name', 'last_name', 'password',
         )
         extra_kwargs = {'password': {'write_only': True}}
 
@@ -37,7 +37,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'email', 'id', 'username', 'first_name', 'last_name',
-            'is_subscribed', 'avatar'
+            'is_subscribed', 'avatar',
         )
 
     def get_is_subscribed(self, obj):
@@ -69,13 +69,13 @@ class SubscriptionListSerializer(UserSerializer):
         recipes_limit = request.query_params.get('recipes_limit')
 
         recipes = obj.recipes.all()
-        if recipes_limit and isinstance(recipes_limit, str) and recipes_limit.isdigit():
+        if recipes_limit and recipes_limit.isdigit():
             recipes = recipes[:int(recipes_limit)]
 
         return ShortRecipeSerializer(
             recipes,
             many=True,
-            context={'request': request}
+            context={'request': request},
         ).data
 
 
@@ -154,7 +154,7 @@ class RecipeReadSerializer(serializers.ModelSerializer):
         model = Recipe
         fields = (
             'id', 'author', 'ingredients', 'is_favorited',
-            'is_in_shopping_cart', 'name', 'image', 'text', 'cooking_time'
+            'is_in_shopping_cart', 'name', 'image', 'text', 'cooking_time',
         )
 
     def get_is_favorited(self, obj):
@@ -179,7 +179,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = (
-            'id', 'ingredients', 'name', 'image', 'text', 'cooking_time'
+            'id', 'ingredients', 'name', 'image', 'text', 'cooking_time',
         )
 
     def validate_ingredients(self, value):
@@ -199,7 +199,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         if request and request.method in ('PUT', 'PATCH'):
             if 'ingredients' not in data or not data['ingredients']:
                 raise serializers.ValidationError({
-                    'ingredients': 'Это поле обязательно при обновлении рецепта.'
+                    'ingredients': 'Это поле обязательно при обновлении рецепта.',
                 })
         return data
 
@@ -209,8 +209,9 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             RecipeIngredient(
                 recipe=recipe,
                 ingredient=ingredient_data['id'],
-                amount=ingredient_data['amount']
-            ) for ingredient_data in ingredients
+                amount=ingredient_data['amount'],
+            )
+            for ingredient_data in ingredients
         ]
         RecipeIngredient.objects.bulk_create(ingredients_to_create)
 
@@ -232,7 +233,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         return RecipeReadSerializer(
             instance,
-            context={'request': self.context.get('request')}
+            context={'request': self.context.get('request')},
         ).data
 
 
