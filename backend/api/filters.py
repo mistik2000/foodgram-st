@@ -2,7 +2,7 @@ import django_filters
 from django_filters.rest_framework import FilterSet, filters, CharFilter
 from rest_framework.filters import SearchFilter
 
-from .models import Recipe, Ingredient
+from recipes.models import Recipe, Ingredient
 
 
 class IngredientSearchFilter(SearchFilter):
