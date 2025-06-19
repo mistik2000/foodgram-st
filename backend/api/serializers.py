@@ -199,7 +199,10 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         if request and request.method in ('PUT', 'PATCH'):
             if 'ingredients' not in data or not data['ingredients']:
                 raise serializers.ValidationError({
-                    'ingredients': 'Это поле обязательно при обновлении рецепта.',
+                    'ingredients': (
+                        'Это поле обязательно '
+                        'при обновлении рецепта.'
+                    ),
                 })
         return data
 
