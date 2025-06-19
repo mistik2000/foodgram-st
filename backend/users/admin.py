@@ -1,4 +1,4 @@
-import django.contrib.admin
+from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 
@@ -8,7 +8,8 @@ from .models import Subscription, User
 @django.contrib.admin.register(User)
 class UserAdmin(BaseUserAdmin):
     list_display = (
-        'username', 'email', 'first_name', 'last_name', 'avatar_tag', 'is_staff', 'is_active'
+        'username', 'email', 'first_name', 'last_name',
+        'avatar_tag', 'is_staff', 'is_active'
     )
     list_display_links = ('username', 'email')
     list_filter = ('is_staff', 'is_superuser', 'is_active')
@@ -17,18 +18,30 @@ class UserAdmin(BaseUserAdmin):
     readonly_fields = ('id',)
 
     fieldsets = (
-        (None, {'fields': ('username', 'email', 'password')}),
-        ('Личная информация', {'fields': ('first_name', 'last_name', 'avatar')}),
-        ('Права доступа', {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
+        (None, {
+            'fields': ('username', 'email', 'password')
         }),
-        ('Важные даты', {'fields': ('last_login', 'date_joined')}),
+        ('Личная информация', {
+            'fields': ('first_name', 'last_name', 'avatar')
+        }),
+        ('Права доступа', {
+            'fields': (
+                'is_active', 'is_staff', 'is_superuser',
+                'groups', 'user_permissions'
+            )
+        }),
+        ('Важные даты', {
+            'fields': ('last_login', 'date_joined')
+        }),
     )
 
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'email', 'first_name', 'last_name', 'password1', 'password2'),
+            'fields': (
+                'username', 'email', 'first_name',
+                'last_name', 'password1', 'password2'
+            ),
         }),
     )
 

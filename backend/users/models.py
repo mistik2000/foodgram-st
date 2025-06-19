@@ -1,16 +1,21 @@
-from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
 from django.db import models
+from django.contrib.auth.models import AbstractUser
 
 
 class User(AbstractUser):
     username = models.CharField(
         max_length=150,
         unique=True,
-        validators=[RegexValidator(
-            regex=r'^[\w.@+-]+$',
-            message='Имя пользователя может содержать только буквы, цифры и символы @/./+/-/_',
-        )],
+        validators=[
+            RegexValidator(
+                regex=r'^[\w.@+-]+$',
+                message=(
+                    'Имя пользователя может содержать только буквы, '
+                    'цифры и символы @/./+/-/_'
+                ),
+            )
+        ],
         verbose_name='Имя пользователя'
     )
     email = models.EmailField(
@@ -58,7 +63,10 @@ class Subscription(models.Model):
         related_name='subscribers',
         verbose_name='Автор'
     )
-    created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    created = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
 
     class Meta:
         unique_together = ['user', 'author']

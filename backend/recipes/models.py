@@ -3,7 +3,6 @@ from django.core.validators import MinValueValidator
 from django.db import models
 
 
-
 class Ingredient(models.Model):
     name = models.CharField(
         max_length=100,
@@ -84,13 +83,19 @@ class RecipeIngredient(models.Model):
 
     def __str__(self):
         return f'{self.ingredient.name} в {self.recipe.name} — {self.amount}'
-    
-
 
 
 class Favorite(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='favorites')
-    recipe = models.ForeignKey('Recipe', on_delete=models.CASCADE, related_name='favorited_by')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='favorites'
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='favorited_by'
+    )
 
     class Meta:
         unique_together = ('user', 'recipe')
@@ -99,8 +104,16 @@ class Favorite(models.Model):
 
 
 class ShoppingCart(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shopping_cart')
-    recipe = models.ForeignKey('Recipe', on_delete=models.CASCADE, related_name='in_shopping_cart')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='shopping_cart'
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='in_shopping_cart'
+    )
 
     class Meta:
         unique_together = ('user', 'recipe')

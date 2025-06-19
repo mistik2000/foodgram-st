@@ -1,8 +1,7 @@
-import django_filters
-from django_filters.rest_framework import FilterSet, filters, CharFilter
+from django_filters.rest_framework import CharFilter, FilterSet, filters
 from rest_framework.filters import SearchFilter
 
-from recipes.models import Recipe, Ingredient
+from recipes.models import Ingredient, Recipe
 
 
 class IngredientSearchFilter(SearchFilter):
@@ -38,4 +37,4 @@ class IngredientFilter(FilterSet):
 
     class Meta:
         model = Ingredient
-        fields = ('name',) 
+        fields = ('name',)

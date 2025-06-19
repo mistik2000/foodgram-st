@@ -1,36 +1,43 @@
 from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+
+from rest_framework import status, viewsets, views
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .filters import IngredientSearchFilter, RecipeFilter
-from recipes.models import Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart
-from .permissions import IsOwnerOrReadOnly
-from .serializers import IngredientSerializer, RecipeReadSerializer, RecipeWriteSerializer, ShortRecipeSerializer, FavoriteCartSerializer
-from .pagination import CustomPagination
-
-
-from rest_framework import views
-
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-
+from recipes.models import (
+    Favorite,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+)
 from users.models import User, Subscription
+
+from .filters import IngredientSearchFilter, RecipeFilter
+from .pagination import CustomPagination
+from .permissions import IsOwnerOrReadOnly
 from .serializers import (
+    AvatarSerializer,
+    FavoriteCartSerializer,
+    IngredientSerializer,
+    PasswordChangeSerializer,
+    RecipeReadSerializer,
+    RecipeWriteSerializer,
+    ShortRecipeSerializer,
+    SubscriptionListSerializer,
+    SubscriptionSerializer,
     CustomUserCreateSerializer,
     UserSerializer,
-    SubscriptionListSerializer,
-    PasswordChangeSerializer,
-    AvatarSerializer,
-    SubscriptionSerializer,  
 )
 
 
 class UserViewSet(viewsets.ModelViewSet):
-
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
     pagination_class = CustomPagination
@@ -54,14 +61,19 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return Response(serializer.to_representation(user), status=status.HTTP_201_CREATED)
+        return Response(
+            serializer.to_representation(user),
+            status=status.HTTP_201_CREATED
+        )
 
     @action(detail=False, methods=['get'], permission_classes=(IsAuthenticated,))
     def subscriptions(self, request):
         user = request.user
         authors = User.objects.filter(subscribers__user=user)
         page = self.paginate_queryset(authors)
-        serializer = self.get_serializer(page, many=True, context={'request': request})
+        serializer = self.get_serializer(
+            page, many=True, context={'request': request}
+        )
         return self.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=(IsAuthenticated,))
@@ -70,13 +82,23 @@ class UserViewSet(viewsets.ModelViewSet):
 
         if request.method == 'POST':
             data = {'user': request.user.id, 'author': author.id}
-            serializer = SubscriptionSerializer(data=data, context={'request': request})
+            serializer = SubscriptionSerializer(
+                data=data,
+                context={'request': request}
+            )
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            response_serializer = SubscriptionListSerializer(author, context={'request': request})
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            response_serializer = SubscriptionListSerializer(
+                author, context={'request': request}
+            )
+            return Response(
+                response_serializer.data,
+                status=status.HTTP_201_CREATED
+            )
 
-        deleted_count, _ = Subscription.objects.filter(user=request.user, author=author).delete()
+        deleted_count, _ = Subscription.objects.filter(
+            user=request.user, author=author
+        ).delete()
         if deleted_count == 0:
             return Response(
                 {'errors': 'Вы не были подписаны на этого пользователя.'},
@@ -91,14 +113,18 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['patch'], permission_classes=(IsAuthenticated,), name='me_patch')
     def me_patch(self, request):
-        serializer = self.get_serializer(request.user, data=request.data, partial=True)
+        serializer = self.get_serializer(
+            request.user, data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'], permission_classes=(IsAuthenticated,))
     def set_password(self, request):
-        serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
+        serializer = PasswordChangeSerializer(
+            data=request.data, context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -117,7 +143,6 @@ class UserAvatarView(views.APIView):
     def delete(self, request, *args, **kwargs):
         request.user.avatar.delete(save=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
@@ -209,7 +234,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         shopping_list = self._generate_shopping_list_text(request.user)
 
         response = HttpResponse(
-            shopping_list, content_type='text/plain; charset=utf-8'
+            shopping_list,
+            content_type='text/plain; charset=utf-8'
         )
         response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
         return response

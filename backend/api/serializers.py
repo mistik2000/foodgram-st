@@ -1,9 +1,18 @@
-from django.db import transaction
-from rest_framework import serializers
-from recipes.models import Ingredient, Recipe, RecipeIngredient, Favorite, ShoppingCart
 from django.contrib.auth import get_user_model
-from .fields import Base64ImageField
+from django.db import transaction
+
+from rest_framework import serializers
+
+from recipes.models import (
+    Favorite,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+)
 from users.models import Subscription
+
+from .fields import Base64ImageField
 
 
 User = get_user_model()
@@ -33,7 +42,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_is_subscribed(self, obj):
         user = self.context['request'].user
-        return user.is_authenticated and Subscription.objects.filter(user=user, author=obj).exists()
+        return (
+            user.is_authenticated
+            and Subscription.objects.filter(user=user, author=obj).exists()
+        )
 
 
 class AvatarSerializer(serializers.ModelSerializer):
@@ -53,7 +65,6 @@ class SubscriptionListSerializer(UserSerializer):
         read_only_fields = ('email', 'username', 'first_name', 'last_name')
 
     def get_recipes(self, obj):
-
         request = self.context.get('request')
         recipes_limit = request.query_params.get('recipes_limit')
 
@@ -61,7 +72,11 @@ class SubscriptionListSerializer(UserSerializer):
         if recipes_limit and isinstance(recipes_limit, str) and recipes_limit.isdigit():
             recipes = recipes[:int(recipes_limit)]
 
-        return ShortRecipeSerializer(recipes, many=True, context={'request': request}).data
+        return ShortRecipeSerializer(
+            recipes,
+            many=True,
+            context={'request': request}
+        ).data
 
 
 class PasswordChangeSerializer(serializers.Serializer):
@@ -89,9 +104,13 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         user = data['user']
         author = data['author']
         if user == author:
-            raise serializers.ValidationError('Нельзя подписаться на самого себя.')
+            raise serializers.ValidationError(
+                'Нельзя подписаться на самого себя.'
+            )
         if Subscription.objects.filter(user=user, author=author).exists():
-            raise serializers.ValidationError('Вы уже подписаны на этого пользователя.')
+            raise serializers.ValidationError(
+                'Вы уже подписаны на этого пользователя.'
+            )
         return data
 
 
@@ -140,14 +159,18 @@ class RecipeReadSerializer(serializers.ModelSerializer):
 
     def get_is_favorited(self, obj):
         user = self.context['request'].user
-        return (user.is_authenticated
-                and Favorite.objects.filter(user=user, recipe=obj).exists())
+        return (
+            user.is_authenticated
+            and Favorite.objects.filter(user=user, recipe=obj).exists()
+        )
 
     def get_is_in_shopping_cart(self, obj):
         user = self.context['request'].user
-        return (user.is_authenticated
-                and ShoppingCart.objects.filter(user=user, recipe=obj).exists())
-        
+        return (
+            user.is_authenticated
+            and ShoppingCart.objects.filter(user=user, recipe=obj).exists()
+        )
+
 
 class RecipeWriteSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientWriteSerializer(many=True)
@@ -166,7 +189,9 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             )
         ingredient_ids = [item['id'] for item in value]
         if len(ingredient_ids) != len(set(ingredient_ids)):
-            raise serializers.ValidationError('Ингредиенты не должны повторяться.')
+            raise serializers.ValidationError(
+                'Ингредиенты не должны повторяться.'
+            )
         return value
 
     def validate(self, data):
@@ -209,7 +234,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             instance,
             context={'request': self.context.get('request')}
         ).data
-        
+
 
 class ShortRecipeSerializer(serializers.ModelSerializer):
 
@@ -221,11 +246,10 @@ class ShortRecipeSerializer(serializers.ModelSerializer):
 
 class FavoriteCartSerializer(serializers.ModelSerializer):
     class Meta:
-        model = None  # Будет устанавливаться динамически
+        model = None
         fields = ('recipe',)
 
     def __init__(self, *args, **kwargs):
-        # Устанавливаем модель в зависимости от контекста
         model_class = kwargs.pop('model_class', None)
         if model_class:
             self.Meta.model = model_class
