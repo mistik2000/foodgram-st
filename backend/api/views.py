@@ -203,7 +203,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             short_serializer = self.get_serializer(recipe)
-            return Response(short_serializer.data, status=status.HTTP_201_CREATED)
+            return Response(
+                short_serializer.data,
+                status=status.HTTP_201_CREATED,
+            )
 
         deleted_count, _ = relation.delete()
         if deleted_count == 0:
