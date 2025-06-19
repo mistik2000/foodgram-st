@@ -260,7 +260,9 @@ class FavoriteCartSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         model = self.Meta.model
         if model.objects.filter(user=user, recipe=value).exists():
-            raise serializers.ValidationError('Рецепт уже добавлен.')
+            raise serializers.ValidationError(
+                'Рецепт уже добавлен.'
+            )
         return value
 
     def create(self, validated_data):
